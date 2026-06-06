@@ -41,7 +41,7 @@ st.markdown("""
             Kejuruan Data Analyst — Pusat Pelatihan Kerja Daerah (PPKD) Jakarta Selatan
         </p>
     </div>
-""", unsafe_index=True)
+""", unsafe_allow_html=True) # <-- SUDAH DIPERBAIKI DI SINI
 
 # Menampilkan informasi sistem dalam struktur kolom yang rapi
 info_col1, info_col2 = st.columns(2)
@@ -158,10 +158,10 @@ if st.button('🚀 Mulai Analisis Prediksi', type='primary', use_container_width
         st.info('Mohon pastikan format isian data Anda telah sesuai dengan ketentuan konfigurasi model.')
 
 # 6. Catatan Kaki / Footer Dashboard Halaman
-st.markdown("<br><hr>", unsafe_index=True)
+st.markdown("<br><hr>", unsafe_allow_html=True) # <-- PASTIKAN DI SINI JUGA SUDAH 'unsafe_allow_html=True'
 st.markdown(
     "<p style='text-align: center; color: #718096; font-size: 14px;'>"
     "Dashboard Aplikasi Tabular Classifier © 2026 | PPKD Jakarta Selatan"
     "</p>", 
-    unsafe_index=True
+    unsafe_allow_html=True # <-- PASTIKAN DI SINI JUGA SUDAH 'unsafe_allow_html=True'
 )
