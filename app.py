@@ -97,7 +97,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # 4. Tombol Aksi Utama Pemrosesan Prediksi
 if st.button('🚀 Mulai Analisis Prediksi', type='primary', use_container_width=True):
     try:
-        # Proses duplikasi data untuk manipulasi angka biner
+        # Proses duplikasi data untuk pencocokan nilai biner
         data_proses = input_user.copy()
 
         # Encoding Kategorikal Otomatis (Mapping ke Angka Biner)
@@ -110,43 +110,23 @@ if st.button('🚀 Mulai Analisis Prediksi', type='primary', use_container_width
         if 'beasiswa' in data_proses:
             data_proses['beasiswa'] = 1 if data_proses['beasiswa'] == 'Ya' else 0
 
-        df_input = pd.DataFrame([data_proses])
+        # === PERBAIKAN DI SINI: Susun DataFrame sesuai urutan NUM_COLS + CAT_COLS ===
+        # Kita buat list urutan kolom yang bersih dari id_mahasiswa
+        urutan_kolom = [kol for kol in NUM_COLS + CAT_COLS if kol.lower() != 'id_mahasiswa']
+        
+        # Buat DataFrame dengan urutan kolom yang pasti sama seperti training data
+        df_input = pd.DataFrame([data_proses])[urutan_kolom]
 
-        if 'id_mahasiswa' in df_input.columns:
-            df_input = df_input.drop(columns=['id_mahasiswa'])
+        # Jalankan Selector untuk menyaring 9 fitur menjadi 5 fitur terbaik
+        X_sel = selector.transform(df_input)
 
-        # Menghubungkan ke Selector Fitur (SelectKBest)
-        try:
-            X_sel = selector.transform(df_input)
-        except Exception:
-            X_sel = df_input
-
-        # Komputasi Probabilitas Model
+        # Komputasi Probabilitas Model menggunakan 5 fitur terpilih
         proba = model.predict_proba(X_sel)[0, 1]
         pred  = int(proba >= threshold)
         kelas_pred = le.classes_[pred]
 
         st.divider()
         st.subheader('📊 Hasil Analisis Model Klasifikasi')
-        
-        # Desain visual kartu penanda hasil klasifikasi kelulusan
-        with st.container():
-            # Jika hasil prediksi bernilai positif/Lulus Tepat Waktu (disesuaikan dengan label target Anda)
-            if pred == 1 or str(kelas_pred).lower() == 'ya' or 'tepat' in str(kelas_pred).lower():
-                st.balloons()
-                st.success(f"### 🎉 REKOMENDASI HASIL: **{str(kelas_pred).upper()}**")
-            else:
-                st.warning(f"### ⚠️ REKOMENDASI HASIL: **{str(kelas_pred).upper()}**")
-                
-            # Menampilkan Visualisasi Indikator Progress Bar Probabilitas
-            st.markdown(f"**Keyakinan Model (Probabilitas Kelas Positif):** `{proba*100:.2f}%`")
-            st.progress(float(proba))
-
-        # Menampilkan Metrik Komparasi secara Sejajar (Card Metric)
-        res_col1, res_col2, res_col3 = st.columns(3)
-        res_col1.metric(label="Skor Probabilitas", value=f"{proba:.4f}", delta="Akurasi Model")
-        res_col2.metric(label="Threshold Sistem", value=f"{threshold:.4f}")
-        res_col3.metric(label="Status Prediksi", value="Sukses ✅")
 
         # 5. Tabel Histori Input Data yang Dimasukkan
         st.markdown("<br>", unsafe_index=True)
