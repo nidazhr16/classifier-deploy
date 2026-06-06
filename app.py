@@ -5,6 +5,9 @@ import numpy as np
 import category_encoders as ce
 
 st.set_page_config(page_title='Classifier Tabular', page_icon=':bar_chart:', layout='wide')
+
+def hapus_id(df):
+    return df.drop(columns=['id_mahasiswa'], errors='ignore')
  
 @st.cache_resource
 def load_artefak():
