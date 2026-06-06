@@ -106,4 +106,4 @@ if st.button('Prediksi', type='primary', use_container_width=True):
         st.info('Periksa nilai input - pastikan nilai kategorikal sesuai dengan data training.')
 
 
-st.caption('Dibuat untuk PPKD Jakarta Selatan - Kejuruan Data Analyst') PPKD Jakarta Selatan - Kejuruan Data Analyst')
+st.caption('Dibuat untuk PPKD Jakarta Selatan - Kejuruan Data Analyst') 
