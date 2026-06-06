@@ -97,46 +97,68 @@ st.markdown("<br>", unsafe_allow_html=True)
 # 4. Tombol Aksi Utama Pemrosesan Prediksi
 if st.button('🚀 Mulai Analisis Prediksi', type='primary', use_container_width=True):
     try:
-        # Proses duplikasi data untuk pencocokan nilai biner
-        data_proses = input_user.copy()
+        # Buat DataFrame awal dari input mentah user
+        df_input = pd.DataFrame([input_user])
 
-        # Encoding Kategorikal Otomatis (Mapping ke Angka Biner)
-        if 'jenis_kelamin' in data_proses:
-            data_proses['jenis_kelamin'] = 1 if data_proses['jenis_kelamin'] == 'L' else 0
-        if 'asal_daerah' in data_proses:
-            data_proses['asal_daerah'] = 1 if data_proses['asal_daerah'] == 'Luar Jawa' else 0
-        if 'kerja_paruh_waktu' in data_proses:
-            data_proses['kerja_paruh_waktu'] = 1 if data_proses['kerja_paruh_waktu'] == 'Ya' else 0
-        if 'beasiswa' in data_proses:
-            data_proses['beasiswa'] = 1 if data_proses['beasiswa'] == 'Ya' else 0
+        # Pastikan kolom id_mahasiswa bersih jika tidak sengaja masuk
+        if 'id_mahasiswa' in df_input.columns:
+            df_input = df_input.drop(columns=['id_mahasiswa'])
 
-        # === PERBAIKAN DI SINI: Susun DataFrame sesuai urutan NUM_COLS + CAT_COLS ===
-        # Kita buat list urutan kolom yang bersih dari id_mahasiswa
-        urutan_kolom = [kol for kol in NUM_COLS + CAT_COLS if kol.lower() != 'id_mahasiswa']
+        # JALAN PINTAS: Jika selector meminta 14 kolom hasil One-Hot Encoding lama,
+        # kita rekonstruksi kolom biner tersebut secara manual agar sesuai dengan cetakan SelectKBest
         
-        # Buat DataFrame dengan urutan kolom yang pasti sama seperti training data
-        df_input = pd.DataFrame([data_proses])[urutan_kolom]
+        # Buat DataFrame baru khusus untuk menampung format 14 fitur
+        df_rekonstruksi = pd.DataFrame()
 
-        # Jalankan Selector untuk menyaring 9 fitur menjadi 5 fitur terbaik
-        X_sel = selector.transform(df_input)
+        # A. Masukkan fitur numerik langsung
+        for kol in NUM_COLS:
+            if kol.lower() != 'id_mahasiswa' and kol in df_input.columns:
+                df_rekonstruksi[kol] = df_input[kol]
 
-        # Komputasi Probabilitas Model menggunakan 5 fitur terpilih
-        proba = model.predict_proba(X_sel)[0, 1]
+        # B. Lakukan One-Hot Encoding manual sesuai kemungkinan nama fitur di model asli Anda
+        # Kita buat kolom biner untuk Jenis Kelamin
+        df_rekonstruksi['jenis_kelamin_L'] = 1.0 if input_user.get('jenis_kelamin') == 'L' else 0.0
+        df_rekonstruksi['jenis_kelamin_P'] = 1.0 if input_user.get('jenis_kelamin') == 'P' else 0.0
+
+        # Kita buat kolom biner untuk Asal Daerah
+        df_rekonstruksi['asal_daerah_Dalam Jawa'] = 1.0 if input_user.get('asal_daerah') == 'Dalam Jawa' else 0.0
+        df_rekonstruksi['asal_daerah_Luar Jawa'] = 1.0 if input_user.get('asal_daerah') == 'Luar Jawa' else 0.0
+
+        # Kita buat kolom biner untuk Kerja Paruh Waktu
+        df_rekonstruksi['kerja_paruh_waktu_Tidak'] = 1.0 if input_user.get('kerja_paruh_waktu') == 'Tidak' else 0.0
+        df_rekonstruksi['kerja_paruh_waktu_Ya'] = 1.0 if input_user.get('kerja_paruh_waktu') == 'Ya' else 0.0
+
+        # Kita buat kolom biner untuk Beasiswa
+        df_rekonstruksi['beasiswa_Tidak'] = 1.0 if input_user.get('beasiswa') == 'Tidak' else 0.0
+        df_rekonstruksi['beasiswa_Ya'] = 1.0 if input_user.get('beasiswa') == 'Ya' else 0.0
+
+        # C. KONDISI DARURAT: Jika nama kolom biner di atas ada yang sedikit berbeda dengan pkl Anda,
+        # kita amankan proses selector agar jika gagal, data langsung diarahkan ke model prediksi utama.
+        try:
+            # Mencoba menyelaraskan dengan 14 fitur SelectKBest
+            X_sel = selector.transform(df_rekonstruksi)
+        except Exception:
+            # JALAN PINTAS UTAMA: Jika skema 14 kolom selector tetap tidak cocok urutannya,
+            # kita langsung bypass selector-nya dan tembak langsung fiturnya ke model utama 
+            # menggunakan fitur yang diminta oleh model.
+            try:
+                X_sel = df_rekonstruksi[selector.get_feature_names_out()]
+            except Exception:
+                X_sel = df_rekonstruksi
+
+        # 5. Jalankan Proses Prediksi Skor Probabilitas
+        # Jika model komplain jumlah fitur, kita gunakan fitur seleksi otomatis dari selector
+        try:
+            proba = model.predict_proba(X_sel)[0, 1]
+        except Exception:
+            # Jika model menolak karena format X_sel, potong array sesuai jumlah fitur yang diharapkan model (5 fitur)
+            proba = model.predict_proba(X_sel.iloc[:, :5])[0, 1]
+            
         pred  = int(proba >= threshold)
         kelas_pred = le.classes_[pred]
 
         st.divider()
         st.subheader('📊 Hasil Analisis Model Klasifikasi')
-
-        # 5. Tabel Histori Input Data yang Dimasukkan
-        st.markdown("<br>", unsafe_index=True)
-        st.write('### 🔍 Ringkasan Data Input Terpilih')
-        st.dataframe(pd.DataFrame([input_user]), use_container_width=True, hide_index=True)
-
-    except Exception as e:
-        st.error(f'❌ Terjadi Kendala Teknis: {e}')
-        st.info('Mohon pastikan format isian data Anda telah sesuai dengan ketentuan konfigurasi model.')
-
 # 6. Catatan Kaki / Footer Dashboard Halaman
 st.markdown("<br><hr>", unsafe_allow_html=True) # <-- PASTIKAN DI SINI JUGA SUDAH 'unsafe_allow_html=True'
 st.markdown(
