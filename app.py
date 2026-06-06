@@ -9,7 +9,7 @@ st.set_page_config(page_title='Classifier Tabular', page_icon=':bar_chart:', lay
 @st.cache_resource
 def load_artefak():
     # Memuat artefak model dan kelengkapannya
-    model        = joblib.load('model.pkl')
+    model        = joblib.load('lr_best.pkl')
     selector     = joblib.load('selector.pkl')
     le           = joblib.load('label_encoder.pkl')
     meta         = joblib.load('meta.pkl')
