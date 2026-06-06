@@ -92,7 +92,7 @@ with col2:
         else:
             input_user[kol] = st.text_input(label=f"➡️ {label_rapi}", value='', key=f'cat_{kol}')
 
-st.markdown("<br>", unsafe_index=True)
+st.markdown("<br>", unsafe_allow_html=True)
 
 # 4. Tombol Aksi Utama Pemrosesan Prediksi
 if st.button('🚀 Mulai Analisis Prediksi', type='primary', use_container_width=True):
