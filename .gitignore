@@ -1,0 +1,13 @@
+# Dataset (jangan commit ke repo publik kalau berisi PII)
+data_kelulusan_mahasiswa.csv
+X_train_clean.csv
+X_test_clean.csv
+y_train.csv
+y_test.csv
+*.npy
+ 
+# Virtual environment & cache
+__pycache__/
+.venv/
+*.pyc
+.ipynb_checkpoints/
