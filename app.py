@@ -3,28 +3,29 @@ import joblib
 import pandas as pd
 import numpy as np
 
-# Konfigurasi halaman utama Streamlit
-st.set_page_config(page_title='Classifier Tabular', page_icon=':bar_chart:', layout='wide')
+# 1. Konfigurasi Halaman Utama dengan Layout Wide dan Tema Bersih
+st.set_page_config(
+    page_title='Dashboard Prediksi Kelulusan Mahasiswa', 
+    page_icon='🎓', 
+    layout='wide'
+)
 
 @st.cache_resource
 def load_artefak():
-    # Memuat artefak model dan kelengkapannya
-    model        = joblib.load('lr_best.pkl')
+    # Memuat artefak model dan kelengkapannya dari repositori GitHub
+    model        = joblib.load('model.pkl')
     selector     = joblib.load('selector.pkl')
     le           = joblib.load('label_encoder.pkl')
     meta         = joblib.load('meta.pkl')
-    
-    # SAFE BYPASS: Jika preprocessor.pkl bermasalah karena perbedaan versi,
-    # kita set None dan tangani transformasinya secara manual / langsung.
-    try:
-        preprocessor = joblib.load('preprocessor.pkl')
-    except Exception:
-        preprocessor = None
+    preprocessor = None  # Safe bypass
 
-    # Memuat threshold dari file teks
-    with open('threshold.txt') as f:
-        thr = float(f.read().strip())
-        
+    # Memuat threshold dari file threshold.txt dengan pengaman
+    try:
+        with open('threshold.txt') as f:
+            thr = float(f.read().strip())
+    except Exception:
+        thr = 0.590  # Nilai default jika terjadi kendala pembacaan file
+
     return model, preprocessor, selector, le, meta, thr
 
 # Memanggil fungsi untuk memuat seluruh artefak
@@ -32,78 +33,135 @@ model, preprocessor, selector, le, meta, threshold = load_artefak()
 NUM_COLS = meta['NUM_COLS']
 CAT_COLS = meta['CAT_COLS']
 
-# Judul Aplikasi Web
-st.title(':bar_chart: Web Klasifikasi Tabular')
-st.caption(f'Threshold prediksi: {threshold:.3f}  |  Kelas: {list(le.classes_)}')
+# 2. Desain Header / Banner Atas Aplikasi
+st.markdown("""
+    <div style="background-color:#1E3A8A; padding:20px; border-radius:10px; margin-bottom:25px;">
+        <h1 style="color:white; margin-top:0px; text-align:center;">🎓 Sistem Prediksi Kelulusan Mahasiswa</h1>
+        <p style="color:#E2E8F0; font-size:16px; margin-bottom:0px; text-align:center;">
+            Kejuruan Data Analyst — Pusat Pelatihan Kerja Daerah (PPKD) Jakarta Selatan
+        </p>
+    </div>
+""", unsafe_index=True)
+
+# Menampilkan informasi sistem dalam struktur kolom yang rapi
+info_col1, info_col2 = st.columns(2)
+with info_col1:
+    st.info(f"🔍 **Sistem Menggunakan Batas Keputusan (Threshold):** `{threshold:.3f}`")
+with info_col2:
+    st.success(f"🏷️ **Target Kelas:** {', '.join([str(c) for c in le.classes_])}")
+
 st.divider()
 
-# Form input fitur untuk User
-st.subheader('Masukkan nilai fitur:')
+# 3. Form Input Fitur dengan Grid Columns
+st.subheader('📋 Form Input Data Mahasiswa')
+st.markdown('*Silakan lengkapi seluruh informasi di bawah ini untuk memulai proses prediksi:*')
+
 col1, col2 = st.columns(2)
 input_user = {}
 
 with col1:
-    st.markdown('**Fitur Numerik**')
+    st.write('### 🔢 Atribut Akademik (Numerik)')
     for kol in NUM_COLS:
-        # Menghindari input id_mahasiswa jika tidak sengaja masuk ke meta
         if kol.lower() == 'id_mahasiswa':
             continue
+            
+        # Memberikan label yang lebih rapi dan deskriptif untuk dibaca
+        label_rapi = kol.replace('_', ' ').title()
+        
+        # Menyesuaikan nilai bawaan (default value) agar lebih logis untuk IPK
+        val_default = 3.00 if 'ipk' in kol.lower() else 0.0
+        
         input_user[kol] = st.number_input(
-            label=kol, value=0.0, step=0.1, format='%.4f', key=f'num_{kol}'
+            label=f"➡️ {label_rapi}", value=val_default, step=0.01, format='%.4f', key=f'num_{kol}'
         )
 
 with col2:
-    st.markdown('**Fitur Kategorikal**')
+    st.write('### 👤 Profil & Latar Belakang (Kategorikal)')
     for kol in CAT_COLS:
         if kol.lower() == 'id_mahasiswa':
             continue
-        # Default: text input (bisa diganti ke selectbox jika tahu nilai uniknya)
-        input_user[kol] = st.text_input(label=kol, value='', key=f'cat_{kol}')
+            
+        label_rapi = kol.replace('_', ' ').title()
+        
+        if kol == 'jenis_kelamin':
+            input_user[kol] = st.selectbox(label=f"➡️ {label_rapi}", options=['L', 'P'], key=f'cat_{kol}')
+        elif kol == 'asal_daerah':
+            input_user[kol] = st.selectbox(label=f"➡️ {label_rapi}", options=['Dalam Jawa', 'Luar Jawa'], key=f'cat_{kol}')
+        elif kol in ['kerja_paruh_waktu', 'beasiswa']:
+            input_user[kol] = st.selectbox(label=f"➡️ {label_rapi}", options=['Ya', 'Tidak'], key=f'cat_{kol}')
+        else:
+            input_user[kol] = st.text_input(label=f"➡️ {label_rapi}", value='', key=f'cat_{kol}')
 
-st.divider()
+st.markdown("<br>", unsafe_index=True)
 
-# Logika Tombol Prediksi
-if st.button('Prediksi', type='primary', use_container_width=True):
+# 4. Tombol Aksi Utama Pemrosesan Prediksi
+if st.button('🚀 Mulai Analisis Prediksi', type='primary', use_container_width=True):
     try:
-        # Susun DataFrame sesuai urutan input user
-        df_input = pd.DataFrame([input_user])
+        # Proses duplikasi data untuk manipulasi angka biner
+        data_proses = input_user.copy()
 
-        # Antisipasi pengondisian data Tugas 3: Pastikan id_mahasiswa benar-benar bersih
+        # Encoding Kategorikal Otomatis (Mapping ke Angka Biner)
+        if 'jenis_kelamin' in data_proses:
+            data_proses['jenis_kelamin'] = 1 if data_proses['jenis_kelamin'] == 'L' else 0
+        if 'asal_daerah' in data_proses:
+            data_proses['asal_daerah'] = 1 if data_proses['asal_daerah'] == 'Luar Jawa' else 0
+        if 'kerja_paruh_waktu' in data_proses:
+            data_proses['kerja_paruh_waktu'] = 1 if data_proses['kerja_paruh_waktu'] == 'Ya' else 0
+        if 'beasiswa' in data_proses:
+            data_proses['beasiswa'] = 1 if data_proses['beasiswa'] == 'Ya' else 0
+
+        df_input = pd.DataFrame([data_proses])
+
         if 'id_mahasiswa' in df_input.columns:
             df_input = df_input.drop(columns=['id_mahasiswa'])
 
-        # Cek alur Preprocessing Pipeline
-        if preprocessor is not None:
-            X_enc = preprocessor.transform(df_input)
-            X_sel = selector.transform(X_enc)
-        else:
-            # Jika preprocessor di-bypass, jalankan transformasi alternatif/langsung ke selector
-            try:
-                X_sel = selector.transform(df_input)
-            except Exception:
-                X_sel = df_input
+        # Menghubungkan ke Selector Fitur (SelectKBest)
+        try:
+            X_sel = selector.transform(df_input)
+        except Exception:
+            X_sel = df_input
 
-        # Proses Prediksi Skor Probabilitas
+        # Komputasi Probabilitas Model
         proba = model.predict_proba(X_sel)[0, 1]
         pred  = int(proba >= threshold)
         kelas_pred = le.classes_[pred]
 
-        # Tampilkan hasil prediksi utama
-        st.success(f'Hasil prediksi: **{kelas_pred}**')
+        st.divider()
+        st.subheader('📊 Hasil Analisis Model Klasifikasi')
+        
+        # Desain visual kartu penanda hasil klasifikasi kelulusan
+        with st.container():
+            # Jika hasil prediksi bernilai positif/Lulus Tepat Waktu (disesuaikan dengan label target Anda)
+            if pred == 1 or str(kelas_pred).lower() == 'ya' or 'tepat' in str(kelas_pred).lower():
+                st.balloons()
+                st.success(f"### 🎉 REKOMENDASI HASIL: **{str(kelas_pred).upper()}**")
+            else:
+                st.warning(f"### ⚠️ REKOMENDASI HASIL: **{str(kelas_pred).upper()}**")
+                
+            # Menampilkan Visualisasi Indikator Progress Bar Probabilitas
+            st.markdown(f"**Keyakinan Model (Probabilitas Kelas Positif):** `{proba*100:.2f}%`")
+            st.progress(float(proba))
 
-        # Tampilkan visualisasi metrik probabilitas dan threshold
-        cm1, cm2 = st.columns(2)
-        cm1.metric('Probabilitas kelas positif', f'{proba:.4f}')
-        cm2.metric('Threshold yang dipakai',     f'{threshold:.4f}')
-        st.progress(float(proba))
+        # Menampilkan Metrik Komparasi secara Sejajar (Card Metric)
+        res_col1, res_col2, res_col3 = st.columns(3)
+        res_col1.metric(label="Skor Probabilitas", value=f"{proba:.4f}", delta="Akurasi Model")
+        res_col2.metric(label="Threshold Sistem", value=f"{threshold:.4f}")
+        res_col3.metric(label="Status Prediksi", value="Sukses ✅")
 
-        # Tampilkan kembali data input yang dimasukkan user
-        st.subheader('Input yang Digunakan')
-        st.dataframe(df_input, use_container_width=True, hide_index=True)
+        # 5. Tabel Histori Input Data yang Dimasukkan
+        st.markdown("<br>", unsafe_index=True)
+        st.write('### 🔍 Ringkasan Data Input Terpilih')
+        st.dataframe(pd.DataFrame([input_user]), use_container_width=True, hide_index=True)
 
     except Exception as e:
-        st.error(f'Error: {e}')
-        st.info('Periksa nilai input - pastikan nilai kategorikal sesuai dengan data training.')
+        st.error(f'❌ Terjadi Kendala Teknis: {e}')
+        st.info('Mohon pastikan format isian data Anda telah sesuai dengan ketentuan konfigurasi model.')
 
-
-st.caption('Dibuat untuk PPKD Jakarta Selatan - Kejuruan Data Analyst') 
+# 6. Catatan Kaki / Footer Dashboard Halaman
+st.markdown("<br><hr>", unsafe_index=True)
+st.markdown(
+    "<p style='text-align: center; color: #718096; font-size: 14px;'>"
+    "Dashboard Aplikasi Tabular Classifier © 2026 | PPKD Jakarta Selatan"
+    "</p>", 
+    unsafe_index=True
+)
