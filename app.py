@@ -13,7 +13,7 @@ st.set_page_config(
 @st.cache_resource
 def load_artefak():
     # Memuat artefak model dan kelengkapannya dari repositori GitHub
-    model        = joblib.load('model.pkl')
+    model        = joblib.load('lr_best.pkl')
     selector     = joblib.load('selector.pkl')
     le           = joblib.load('label_encoder.pkl')
     meta         = joblib.load('meta.pkl')
